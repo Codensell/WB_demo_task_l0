@@ -1,0 +1,15 @@
+# Go
+/bin/
+/build/
+/dist/
+*.test
+*.out
+
+# macOS / IDE
+.DS_Store
+.vscode/
+.idea/
+
+# env / logs
+.env
+*.log
