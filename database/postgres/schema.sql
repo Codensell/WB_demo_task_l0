@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS items (
   name TEXT,
   sale INT,
   size TEXT,
-  total_price INT,
+  total_price BIGINT,
   nm_id BIGINT,
   brand TEXT,
   status INT

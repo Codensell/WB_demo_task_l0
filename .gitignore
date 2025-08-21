@@ -1,15 +1,20 @@
-# Go
+# Go build artifacts
 /bin/
 /build/
 /dist/
 *.test
 *.out
 
-# macOS / IDE
+# macOS system files
 .DS_Store
+
+# IDE / Editors
 .vscode/
 .idea/
 
-# env / logs
+# PostgreSQL / Docker
 .env
 *.log
+database/postgres/*.log
+database/postgres/*.pid
+
