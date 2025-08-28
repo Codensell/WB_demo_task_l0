@@ -1,0 +1,49 @@
+<!doctype html><meta charset="utf-8">
+<a href="/">назад</a>
+<h1>Заказ {{.OrderUID}}</h1>
+
+<h2>Основное</h2>
+<ul>
+  <li>track_number: {{.TrackNumber}}</li>
+  <li>entry: {{.Entry}}</li>
+  <li>locale: {{.Locale}}</li>
+  <li>customer_id: {{.CustomerID}}</li>
+  <li>delivery_service: {{.DeliveryService}}</li>
+  <li>shardkey: {{.ShardKey}}</li>
+  <li>sm_id: {{.SmID}}</li>
+  <li>oof_shard: {{.OofShard}}</li>
+  <li>date_created: {{.DateCreated}}</li>
+</ul>
+
+<h2>Доставка</h2>
+<ul>
+  <li>{{.Delivery.Name}} ({{.Delivery.Phone}})</li>
+  <li>{{.Delivery.Address}}, {{.Delivery.City}}, {{.Delivery.Region}}, {{.Delivery.Zip}}</li>
+  <li>{{.Delivery.Email}}</li>
+</ul>
+
+<h2>Оплата</h2>
+<ul>
+  <li>transaction: {{.Payment.Transaction}}</li>
+  <li>{{.Payment.Currency}} / {{.Payment.Provider}} / {{.Payment.Bank}}</li>
+  <li>amount: {{.Payment.Amount}}</li>
+  <li>payment_dt: {{.Payment.PaymentDt}}</li>
+  <li>delivery_cost/goods_total/custom_fee:
+    {{.Payment.DeliveryCost}} / {{.Payment.GoodsTotal}} / {{.Payment.CustomFee}}</li>
+</ul>
+
+<h2>Товары</h2>
+<table border="1" cellpadding="4" cellspacing="0">
+  <thead><tr>
+    <th>chrt_id</th><th>nm_id</th><th>name</th><th>brand</th>
+    <th>size</th><th>price</th><th>sale</th><th>total_price</th><th>status</th>
+  </tr></thead>
+  <tbody>
+    {{range .Items}}
+    <tr>
+      <td>{{.ChrtID}}</td><td>{{.NmID}}</td><td>{{.Name}}</td><td>{{.Brand}}</td>
+      <td>{{.Size}}</td><td>{{.Price}}</td><td>{{.Sale}}</td><td>{{.TotalPrice}}</td><td>{{.Status}}</td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
