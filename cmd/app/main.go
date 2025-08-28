@@ -1,11 +1,15 @@
 package main
 
 import (
+	"encoding/json"
+	"os"
+	"sync"
 	"html/template" //чтобы обойтись без .js при создании веб интерфейса для задачи Л0
 	"log"
 	"net/http" //стандартная библиотека Го, отвечает за сервер, маршрутизацию и готовые интерфейсы
 	"strings"
 	"time"
+	"github.com/CodenSell/WB_test_level0/internal/structs"
 )
 
 //Попробую проверить работоспособность веб интерфейса index.html/view.html
@@ -13,6 +17,9 @@ import (
 type App struct {
 	tmplIndex *template.Template
 	tmplView  *template.Template
+	// дополняем мапой с ключом order_uid и значением структуры Order + mutex для защиты кеша
+	mu sync.RWMutex
+	cache map[string]structs.Order
 }
 
 // Маршрутизация
@@ -35,30 +42,68 @@ func (a *App) handleIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 // обработчик view.html
+// добавил мьютексы для безопасного параллельного чтения и записи кеша
 func (a *App) handleView(w http.ResponseWriter, r *http.Request) {
 	uid := strings.TrimSpace(r.URL.Query().Get("order_uid"))
 	if uid == "" {
 		http.Error(w, "need order_uid", http.StatusBadRequest)
 		return
 	}
+	a.mu.RLock()
+	order, ok := a.cache[uid]
+	a.mu.RUnlock()
+	if !ok{
+		http.Error(w, "order not found", http.StatusNotFound)
+		return
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	data := struct{ UID string }{UID: uid}
-	_ = a.tmplView.Execute(w, data)
+	_ = a.tmplView.Execute(w, order)
 }
 
 // обработчик http запроса, который отдаст json в ответ
+//
 func (a *App) handleAPI(w http.ResponseWriter, r *http.Request) {
-	log.Printf("API hit: %s", r.URL.Path)            // для диагностики
 	uid := strings.TrimPrefix(r.URL.Path, "/order/") // убирает путь до номера заказа
 	if uid == "" || strings.Contains(uid, "/") {
 		http.Error(w, "were waiting for path /order/{order_uid}", http.StatusBadRequest)
 		return
 	}
-	// сейчас просто заглушка, для проверки интерфейса
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(http.StatusNotFound)
-	w.Write([]byte(`{"error":"not found"}`))
+	//читаем из кеша
+	a.mu.RLock()
+	order, ok := a.cache[uid]
+	a.mu.RUnlock()
 
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	if !ok{
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"error":"not found"}`))
+		return
+	}
+	//если ошибок нет то преобразуем go структуру в json
+	enc := json.NewEncoder(w)
+	_ = enc.Encode(order)
+
+}
+//функция для чтения файла, преобразования json в go struct и сохраняю в кеш
+func (a *App) readAndLoadFromFile(path string){
+	data, err := os.ReadFile(path)
+	if err != nil{
+		log.Printf("cant read %s: %v", path, err)
+		return
+	}
+	var o structs.Order
+	if err := json.Unmarshal(data, &o); err != nil{
+		log.Printf("cant unmarshal: %v", err)
+		return
+	}
+	if o.OrderUID == ""{
+		log.Printf("empty order_uid")
+		return
+	}
+	a.mu.Lock()
+	a.cache[o.OrderUID] = o
+	a.mu.Unlock()
+	log.Printf("loaded order %s", o.OrderUID)
 }
 
 func main() {
@@ -68,7 +113,9 @@ func main() {
 	tmplView := template.Must(template.ParseFiles("internal/templates/view.html"))
 
 	// присваиваю структуру App переменной, чтобы потом передать в обработчик (handler)
-	app := &App{tmplIndex: tmplIndex, tmplView: tmplView}
+	app := &App{tmplIndex: tmplIndex, tmplView: tmplView, cache: make(map[string]structs.Order)}
+
+	app.readAndLoadFromFile("model.json")
 
 	srv := &http.Server{
 		Addr:    ":8081",
