@@ -4,34 +4,31 @@ import (
 	"encoding/json"
 	"os"
 	"sync"
-	"html/template" //чтобы обойтись без .js при создании веб интерфейса для задачи Л0
+	"html/template"
 	"log"
-	"net/http" //стандартная библиотека Го, отвечает за сервер, маршрутизацию и готовые интерфейсы
+	"net/http"
 	"strings"
 	"time"
 	"github.com/CodenSell/WB_test_level0/internal/structs"
+	"github.com/CodenSell/WB_test_level0/internal/storage/postgres"
 )
-
-//Попробую проверить работоспособность веб интерфейса index.html/view.html
 
 type App struct {
 	tmplIndex *template.Template
 	tmplView  *template.Template
-	// дополняем мапой с ключом order_uid и значением структуры Order + mutex для защиты кеша
 	mu sync.RWMutex
 	cache map[string]structs.Order
+	repo *postgres.Repository
 }
 
-// Маршрутизация
 func (a *App) routes() http.Handler {
-	mux := http.NewServeMux() // создаю объект роутера и сохраняем в переменной
+	mux := http.NewServeMux()
 	mux.HandleFunc("/", a.handleIndex)
 	mux.HandleFunc("/view", a.handleView)
-	mux.HandleFunc("/order/", a.handleAPI) // тут наш json
+	mux.HandleFunc("/order/", a.handleAPI)
 	return mux
 }
 
-// обработчик index.html
 func (a *App) handleIndex(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
@@ -41,8 +38,6 @@ func (a *App) handleIndex(w http.ResponseWriter, r *http.Request) {
 	_ = a.tmplIndex.Execute(w, nil)
 }
 
-// обработчик view.html
-// добавил мьютексы для безопасного параллельного чтения и записи кеша
 func (a *App) handleView(w http.ResponseWriter, r *http.Request) {
 	uid := strings.TrimSpace(r.URL.Query().Get("order_uid"))
 	if uid == "" {
@@ -60,31 +55,35 @@ func (a *App) handleView(w http.ResponseWriter, r *http.Request) {
 	_ = a.tmplView.Execute(w, order)
 }
 
-// обработчик http запроса, который отдаст json в ответ
-//
 func (a *App) handleAPI(w http.ResponseWriter, r *http.Request) {
-	uid := strings.TrimPrefix(r.URL.Path, "/order/") // убирает путь до номера заказа
+	uid := strings.TrimPrefix(r.URL.Path, "/order/")
 	if uid == "" || strings.Contains(uid, "/") {
 		http.Error(w, "were waiting for path /order/{order_uid}", http.StatusBadRequest)
 		return
 	}
-	//читаем из кеша
+
 	a.mu.RLock()
 	order, ok := a.cache[uid]
 	a.mu.RUnlock()
 
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	if !ok{
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(`{"error":"not found"}`))
-		return
+	if !ok {
+		fromDB, err := a.repo.GetOrder(uid)
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte(`{"error":"not found"}`))
+			return
+		}
+		order = *fromDB
+		a.mu.Lock()
+		a.cache[uid] = order
+		a.mu.Unlock()
 	}
-	//если ошибок нет то преобразуем go структуру в json
-	enc := json.NewEncoder(w)
-	_ = enc.Encode(order)
 
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	_ = json.NewEncoder(w).Encode(order)
 }
-//функция для чтения файла, преобразования json в go struct и сохраняю в кеш
+
 func (a *App) readAndLoadFromFile(path string){
 	data, err := os.ReadFile(path)
 	if err != nil{
@@ -107,20 +106,23 @@ func (a *App) readAndLoadFromFile(path string){
 }
 
 func main() {
-	//функция Must() находится в пакете html/templates, которая принимает результат парсинга без проверок
-	//функция ParseFiles() в том же пакете, загружает html файлы и возвращает ошибку и указатель на Template
+	repo, err := postgres.NewRepository(
+		"tester", "123", "wbrrs", "localhost", 5432,
+	)
+	if err != nil{
+		log.Fatal("cant connect to DB:", err)
+	}
+	log.Println("DB connection true")
 	tmplIndex := template.Must(template.ParseFiles("internal/templates/index.html"))
 	tmplView := template.Must(template.ParseFiles("internal/templates/view.html"))
 
-	// присваиваю структуру App переменной, чтобы потом передать в обработчик (handler)
-	app := &App{tmplIndex: tmplIndex, tmplView: tmplView, cache: make(map[string]structs.Order)}
+	app := &App{tmplIndex: tmplIndex, tmplView: tmplView, cache: make(map[string]structs.Order), repo: repo}
 
-	app.readAndLoadFromFile("model.json")
+	app.readAndLoadFromFile("data/model.json")
 
 	srv := &http.Server{
 		Addr:    ":8081",
 		Handler: app.routes(),
-		// в данном случае timeout не особо нужны
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  60 * time.Second,

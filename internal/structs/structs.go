@@ -45,8 +45,8 @@ type Items struct{
 	Name string `json:"name"`
 	Sale int `json:"sale"`
 	Size string `json:"size"`
-	TotalPrice int64 `json:"total_price"` //in case of hyper inflation
+	TotalPrice int64 `json:"total_price"`
 	NomenclatureID int64 `json:"nm_id"`
 	Brand string `json:"brand"`
-	Status string `json:"status"`
+	Status int `json:"status"`
 }
