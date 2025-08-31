@@ -97,6 +97,7 @@ func (a *App) consumeKafka(ctx context.Context, brokers []string, topic, group s
 
     for {
         m, err := r.ReadMessage(ctx)
+		log.Println(m)
         if err != nil {
             log.Printf("kafka read error: %v", err)
             return
@@ -147,7 +148,10 @@ func (a *App) readAndLoadFromFile(path string){
 
 func main() {
 	repo, err := postgres.NewRepository(
-		"tester", "123", "wbrrs", "localhost", 5432,
+		os.Getenv("POSTGRES_USER"),
+		os.Getenv("POSTGRES_PASSWORD"),
+		os.Getenv("POSTGRES_DB"),
+		"postgres", 5432,
 	)
 	if err != nil{
 		log.Fatal("cant connect to DB:", err)
@@ -161,7 +165,7 @@ func main() {
 	app.readAndLoadFromFile("data/model.json")
 	ctx := context.Background()
 	go app.consumeKafka(ctx,
-		[]string{"localhost:9092"},
+		[]string{os.Getenv("KAFKA_URL")},
 		"orders",
 		"order-service",
 	)

@@ -22,18 +22,32 @@ services:
       KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
       KAFKA_KRAFT_CLUSTER_ID: "ZOKlLvYRR-mSVQr2xmunMQ"
 
-  kafka-ui:
-    container_name: orders-kafka-ui
-    image: provectuslabs/kafka-ui:v0.7.2
-    restart: unless-stopped
+  backend:
+    image: go_orders_backend:latest
     ports:
-      - "8088:8080"
+      - 8081:8081
     environment:
-      KAFKA_CLUSTERS_0_NAME: orders-cluster
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: broker:9092
-      KAFKA_CLUSTERS_0_PROPERTIES_SECURITY_PROTOCOL: PLAINTEXT
+      POSTGRES_USER: tester
+      POSTGRES_PASSWORD: 123
+      POSTGRES_DB: wbrrs
+      KAFKA_URL: broker:29092
     depends_on:
+      - postgres
       - broker
 
+  postgres:
+    image: postgres:17.6
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./database/postgres/:/docker-entrypoint-initdb.d/
+    environment:
+      POSTGRES_USER: tester
+      POSTGRES_PASSWORD: 123
+      POSTGRES_DB: wbrrs
+
 volumes:
-  kafka_data:
+  pg_data:
+
+networks:
+  default:
+    driver: bridge
