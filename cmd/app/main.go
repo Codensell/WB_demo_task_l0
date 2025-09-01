@@ -125,6 +125,27 @@ func (a *App) consumeKafka(ctx context.Context, brokers []string, topic, group s
     }
 }
 
+func (a *App) fillUpCache(ctx context.Context){
+	uids, err := a.repo.ListOrderUIDs(ctx)
+	if err != nil{
+		log.Printf("cache preloaded error: %v", err)
+		return
+	}
+	count := 0
+	for _, uid := range uids{
+		o, err := a.repo.GetOrder(uid)
+		if err != nil{
+			log.Printf("preload get %s: %v", uid, err)
+			continue
+		}
+		a.mu.Lock()
+		a.cache[o.OrderUID] = *o
+		a.mu.Unlock()
+		count++
+	}
+	log.Printf("cache preload done, loaded %d orders", count)
+}
+
 func (a *App) readAndLoadFromFile(path string){
 	data, err := os.ReadFile(path)
 	if err != nil{
@@ -164,6 +185,7 @@ func main() {
 
 	app.readAndLoadFromFile("data/model.json")
 	ctx := context.Background()
+	app.fillUpCache(ctx)
 	go app.consumeKafka(ctx,
 		[]string{os.Getenv("KAFKA_URL")},
 		"orders",

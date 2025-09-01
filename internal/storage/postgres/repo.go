@@ -188,3 +188,19 @@ func (r *Repository) UpsertOrder(ctx context.Context, o *structs.Order) error {
 	err = tx.Commit()
 	return err
 }
+func (r *Repository)ListOrderUIDs(ctx context.Context)([]string, error){
+	rows, err := r.db.QueryContext(ctx, `SELECT order_uid FROM orders`)
+	if err != nil{
+		return nil, err
+	}
+	defer rows.Close()
+	var uids []string
+	for rows.Next(){
+		var uid string
+		if err := rows.Scan(&uid); err != nil{
+			return nil, err
+		}
+		uids = append(uids, uid)
+	}
+	return uids, rows.Err()
+}

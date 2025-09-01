@@ -8,4 +8,5 @@ import(
 type OrderRepo interface{
 	GetOrder(ctx context.Context, uid string)(*structs.Order, error)
 	UpsertOrder(ctx context.Context, o *structs.Order) error
+	ListOrderUIDs(ctx context.Context)([]string, error)
 }
