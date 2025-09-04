@@ -28,7 +28,7 @@ func NewRepository(user, password, dbname, host string, port int) (*Repository, 
 	return &Repository{db: db}, nil
 }
 
-func (r *Repository) GetOrder(orderUID string) (*structs.Order, error) {
+func (r *Repository) GetOrder(ctx context.Context, orderUID string) (*structs.Order, error) {
 	var o structs.Order
 
 	err := r.db.QueryRow(`

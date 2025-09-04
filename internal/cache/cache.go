@@ -13,6 +13,7 @@ import (
 
 	"github.com/CodenSell/WB_test_level0/internal/storage/postgres"
 	"github.com/CodenSell/WB_test_level0/internal/structs"
+	"github.com/CodenSell/WB_test_level0/internal/validation"
 )
 
 type Cache struct {
@@ -42,7 +43,7 @@ func (a *Cache) fillUpCache(ctx context.Context) {
 	}
 	count := 0
 	for _, uid := range uids {
-		o, err := a.repo.GetOrder(uid)
+		o, err := a.repo.GetOrder(ctx, uid)
 		if err != nil {
 			log.Printf("preload get %s: %v", uid, err)
 			continue
@@ -66,8 +67,8 @@ func (a *Cache) readAndLoadFromFile(path string) {
 		log.Printf("cant unmarshal: %v", err)
 		return
 	}
-	if o.OrderUID == "" {
-		log.Printf("empty order_uid")
+	if err := validation.ValidateOrder(&o); err != nil {
+		log.Printf("skip preload invalid model.json: %v", err)
 		return
 	}
 	a.mu.Lock()
@@ -106,7 +107,7 @@ func (a *Cache) GetOrder(ctx context.Context, uid string) (*structs.Order, bool,
 	}
 	a.mu.RUnlock()
 
-	o, err := a.repo.GetOrder(uid)
+	o, err := a.repo.GetOrder(ctx, uid)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, false, nil
